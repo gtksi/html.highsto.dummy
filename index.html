@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Hi!story 代理カードメモ ジェネレーター</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header>
+    <h1>Hi!story 代理カードメモ ジェネレーター</h1>
+    <p class="sub">カードを検索して枚数を指定し、A4印刷用PDFを生成します</p>
+  </header>
+
+  <main>
+    <section class="search-section">
+      <input id="searchBox" type="text" placeholder="カード名・通称で検索（例：ジェンキンス）" autocomplete="off" />
+      <ul id="results" class="results"></ul>
+    </section>
+
+    <section class="queue-section">
+      <h2>選択中のカード <span id="totalCount">(0枚)</span></h2>
+      <ul id="queue" class="queue"></ul>
+      <p class="hint">1枚のA4に最大9枚まで配置されます。9枚を超える分は自動で次のページに送られます。</p>
+      <button id="generateBtn" disabled>PDFを生成してダウンロード</button>
+      <p id="status" class="status"></p>
+    </section>
+  </main>
+
+  <canvas id="workCanvas" width="630" height="880" style="display:none"></canvas>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
