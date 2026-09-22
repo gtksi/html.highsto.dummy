@@ -1,8 +1,7 @@
 /* Hi!story 代理カードメモ ジェネレーター
- * データ読み込み → 検索 → 選択キュー → canvas描画 → jsPDFでA4シート生成
+ * 検索 → 選択キュー → canvas描画 → jsPDFでA4シート生成
+ * データ読み込み・検索・参照関係マップは common.js を参照
  */
-
-const DATA_URL = "data/cards.json";
 
 // ---- レイアウト定数（カード描画） ----
 const SCALE = 10; // px per mm
@@ -21,14 +20,7 @@ const SHRINK_Y_MM = 4; // 上下4mmずつ縮小（2mm+追加2mm）
 const PAGE_W_MM = 210;
 const PAGE_H_MM = 297;
 
-let allCards = [];
 let queue = []; // { card, qty }
-
-async function loadData() {
-  const res = await fetch(DATA_URL);
-  const json = await res.json();
-  allCards = json.cards || [];
-}
 
 // ---------- テキスト折り返し（CJK：文字単位） ----------
 function wrapText(ctx, text, maxWidth) {
@@ -58,10 +50,6 @@ function drawWrapped(ctx, text, x, y, maxWidth, lineHeight) {
     }
   }
   return curY;
-}
-
-function isEmpty(v) {
-  return !v || v === "ー" || v === "-";
 }
 
 // ---------- 1枚のカードをcanvasに描画 ----------
@@ -260,46 +248,55 @@ const totalCountEl = document.getElementById("totalCount");
 const generateBtn = document.getElementById("generateBtn");
 const statusEl = document.getElementById("status");
 
-function effectSummary(card) {
-  const names = [card.effectName1, card.effectName2].filter((n) => !isEmpty(n));
-  return names.join("・");
-}
-
-function dedupeVariants(matches) {
-  const seen = new Map();
-  for (const card of matches) {
-    const key = [
-      card.name,
-      card.alias || "",
-      card.effectName1 || "",
-      card.effectName2 || "",
-      card.rank,
-      card.power,
-      card.attackDefense,
-    ].join("|");
-    if (!seen.has(key)) seen.set(key, card);
-  }
-  return [...seen.values()];
-}
-
 function renderResults(matches) {
   resultsEl.innerHTML = "";
   dedupeVariants(matches)
     .slice(0, 30)
     .forEach((card) => {
       const li = document.createElement("li");
-      li.style.alignItems = "flex-start";
+      li.style.cssText = "flex-direction:column; align-items:stretch;";
+      const row = document.createElement("div");
+      row.style.cssText = "display:flex; justify-content:space-between; align-items:flex-start; gap:8px; width:100%;";
       const label = document.createElement("div");
       const summary = effectSummary(card);
       label.innerHTML = `
         <div>${!isEmpty(card.alias) ? `<span class="alias">『${card.alias}』</span>` : ""}<span class="name">${card.name}</span></div>
         ${summary ? `<div class="effect-summary">${summary}</div>` : ""}
       `;
+      const btnGroup = document.createElement("div");
+      btnGroup.style.cssText = "display:flex; gap:6px; flex-shrink:0;";
+      const refBtn = document.createElement("button");
+      refBtn.textContent = "🔗 関連";
+      refBtn.className = "ref-toggle";
       const btn = document.createElement("button");
       btn.textContent = "追加";
       btn.onclick = () => addToQueue(card);
-      li.appendChild(label);
-      li.appendChild(btn);
+      btnGroup.appendChild(refBtn);
+      btnGroup.appendChild(btn);
+      row.appendChild(label);
+      row.appendChild(btnGroup);
+
+      const panel = document.createElement("div");
+      panel.className = "ref-panel";
+      panel.style.display = "none";
+      refBtn.onclick = () => {
+        const open = panel.style.display !== "none";
+        if (open) {
+          panel.style.display = "none";
+        } else {
+          panel.innerHTML = buildRefPanelHTML(card, { withAddButton: true });
+          panel.style.display = "block";
+          panel.querySelectorAll(".ref-add").forEach((b) => {
+            b.onclick = () => {
+              const target = findCardByName(b.dataset.name);
+              if (target) addToQueue(target);
+            };
+          });
+        }
+      };
+
+      li.appendChild(row);
+      li.appendChild(panel);
       resultsEl.appendChild(li);
     });
 }
@@ -352,14 +349,7 @@ searchBox.addEventListener("input", () => {
     resultsEl.innerHTML = "";
     return;
   }
-  const matches = allCards.filter(
-    (c) =>
-      (c.name && c.name.includes(q)) ||
-      (c.alias && c.alias.includes(q)) ||
-      (c.effectName1 && c.effectName1.includes(q)) ||
-      (c.effectName2 && c.effectName2.includes(q))
-  );
-  renderResults(matches);
+  renderResults(searchCards(q));
 });
 
 generateBtn.addEventListener("click", () => {

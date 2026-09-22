@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Hi!story カード検索・関連カード探索</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header>
+    <h1>Hi!story カード検索・関連カード探索</h1>
+    <p class="sub">カードを検索し、詳細情報と関連カード（参照関係）を確認できます</p>
+    <nav class="app-nav"><a href="index.html">→ 代理カードメモ ジェネレーター</a></nav>
+  </header>
+
+  <main>
+    <section class="search-section">
+      <input id="searchBox" type="text" placeholder="カード名・通称・能力名で検索（例：織田信長）" autocomplete="off" />
+      <ul id="results" class="results"></ul>
+      <p id="status" class="status"></p>
+    </section>
+  </main>
+
+  <script src="common.js"></script>
+  <script src="explorer.js"></script>
+</body>
+</html>
