@@ -59,6 +59,33 @@ function buildDetailHTML(card) {
   return html;
 }
 
+// 参照リスト内のカード名をクリックすると、その場でカード詳細（効果文・収録商品・
+// さらにその先の関連カード）を入れ子で展開できるようにする
+function wireRefClicks(container) {
+  container.querySelectorAll(":scope > .ref-block .ref-targets > li[data-name]").forEach((li) => {
+    // 既にネスト展開済みの子要素はスキップ（二重配線防止）
+    if (li.dataset.wired) return;
+    li.dataset.wired = "1";
+    li.style.cursor = "pointer";
+    li.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const existing = li.querySelector(":scope > .nested-detail");
+      if (existing && existing.contains(e.target)) return; // 展開済み詳細内のクリックは何もしない
+      if (existing) {
+        existing.remove();
+        return;
+      }
+      const target = findCardByName(li.dataset.name);
+      if (!target) return;
+      const nested = document.createElement("div");
+      nested.className = "nested-detail";
+      nested.innerHTML = buildDetailHTML(target);
+      li.appendChild(nested);
+      wireRefClicks(nested);
+    });
+  });
+}
+
 function renderResults(matches) {
   resultsEl.innerHTML = "";
   dedupeVariants(matches)
@@ -94,6 +121,7 @@ function renderResults(matches) {
           panel.innerHTML = buildDetailHTML(card);
           panel.style.display = "block";
           toggle.textContent = "詳細 ▲";
+          wireRefClicks(panel);
         }
       };
 

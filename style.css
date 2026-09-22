@@ -109,11 +109,23 @@ main {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 8px;
   padding: 4px 0;
   border-bottom: 1px dashed #ddd;
 }
 .ref-targets > li:last-child { border-bottom: none; }
+.ref-targets > li[data-name]:hover { background: rgba(42, 91, 215, 0.06); }
+
+.nested-detail {
+  width: 100%;
+  margin: 8px 0 4px;
+  padding: 10px 12px;
+  background: #fff;
+  border-left: 3px solid var(--accent);
+  border-radius: 0 8px 8px 0;
+  cursor: default;
+}
 
 .ref-name { font-weight: 500; margin-right: 6px; }
 .ref-effect { color: var(--muted); font-size: 0.75rem; }

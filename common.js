@@ -135,20 +135,18 @@ function buildRefPanelHTML(card, options = {}) {
     for (const ref of outgoing) {
       const isFamily = ref.matchType === "family";
       html += `<li><span class="ref-token">〈${ref.token}〉${isFamily ? `<span class="ref-tag">系統</span>` : ""}</span><ul class="ref-targets">`;
-      for (const t of ref.targets.slice(0, 8)) {
-        html += `<li>${refTargetLabel(t)}${addBtn(t)}</li>`;
+      for (const t of ref.targets) {
+        html += `<li data-name="${t}">${refTargetLabel(t)}${addBtn(t)}</li>`;
       }
-      if (ref.targets.length > 8) html += `<li class="ref-more">他${ref.targets.length - 8}件</li>`;
       html += `</ul></li>`;
     }
     html += `</ul></div>`;
   }
   if (incoming.length) {
-    html += `<div class="ref-block"><div class="ref-heading">← このカードを参照しているカード</div><ul class="ref-targets">`;
-    for (const inc of incoming.slice(0, 10)) {
-      html += `<li>${refTargetLabel(inc.fromName)}${addBtn(inc.fromName)}</li>`;
+    html += `<div class="ref-block"><div class="ref-heading">← このカードを参照しているカード（${incoming.length}件）</div><ul class="ref-targets">`;
+    for (const inc of incoming) {
+      html += `<li data-name="${inc.fromName}">${refTargetLabel(inc.fromName)}${addBtn(inc.fromName)}</li>`;
     }
-    if (incoming.length > 10) html += `<li class="ref-more">他${incoming.length - 10}件</li>`;
     html += `</ul></div>`;
   }
   return html;
