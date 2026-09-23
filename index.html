@@ -15,7 +15,12 @@
 
   <main>
     <section class="search-section">
-      <input id="searchBox" type="text" placeholder="カード名・通称で検索（例：ジェンキンス）" autocomplete="off" />
+      <input id="searchBox" type="text" placeholder="カード名・通称・属性・効果文で検索（例：ジェンキンス）" autocomplete="off" />
+      <div class="filter-row">
+        <select id="filterAttackDefense"><option value="">攻撃/防御/事変：すべて</option></select>
+        <select id="filterRank"><option value="">ランク/レベル：すべて</option></select>
+        <select id="filterAttribute"><option value="">属性：すべて</option></select>
+      </div>
       <ul id="results" class="results"></ul>
     </section>
 

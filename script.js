@@ -247,8 +247,49 @@ const queueEl = document.getElementById("queue");
 const totalCountEl = document.getElementById("totalCount");
 const generateBtn = document.getElementById("generateBtn");
 const statusEl = document.getElementById("status");
+const filterAttackDefenseEl = document.getElementById("filterAttackDefense");
+const filterRankEl = document.getElementById("filterRank");
+const filterAttributeEl = document.getElementById("filterAttribute");
 
-function renderResults(matches) {
+function populateFilterOptions() {
+  const { attributes, attackDefenses, ranks } = getFilterOptions();
+  for (const v of attackDefenses) {
+    const opt = document.createElement("option");
+    opt.value = v;
+    opt.textContent = v;
+    filterAttackDefenseEl.appendChild(opt);
+  }
+  for (const v of ranks) {
+    const opt = document.createElement("option");
+    opt.value = v;
+    opt.textContent = v;
+    filterRankEl.appendChild(opt);
+  }
+  for (const v of attributes) {
+    const opt = document.createElement("option");
+    opt.value = v;
+    opt.textContent = v;
+    filterAttributeEl.appendChild(opt);
+  }
+}
+
+function runSearch() {
+  const q = searchBox.value.trim();
+  const criteria = {
+    query: q,
+    attackDefense: filterAttackDefenseEl.value,
+    rank: filterRankEl.value,
+    attribute: filterAttributeEl.value,
+  };
+  const hasFilter = criteria.attackDefense || criteria.rank || criteria.attribute;
+  if (!q && !hasFilter) {
+    resultsEl.innerHTML = "";
+    return;
+  }
+  renderResults(filterCards(criteria), q);
+}
+
+function renderResults(matches, query) {
   resultsEl.innerHTML = "";
   dedupeVariants(matches)
     .slice(0, 30)
@@ -259,9 +300,11 @@ function renderResults(matches) {
       row.style.cssText = "display:flex; justify-content:space-between; align-items:flex-start; gap:8px; width:100%;";
       const label = document.createElement("div");
       const summary = effectSummary(card);
+      const snippet = matchSnippet(card, query);
       label.innerHTML = `
         <div>${!isEmpty(card.alias) ? `<span class="alias">『${card.alias}』</span>` : ""}<span class="name">${card.name}</span></div>
         ${summary ? `<div class="effect-summary">${summary}</div>` : ""}
+        ${snippet ? `<div class="match-snippet"><span class="match-field">${snippet.field}</span>${snippet.text}</div>` : ""}
       `;
       const btnGroup = document.createElement("div");
       btnGroup.style.cssText = "display:flex; gap:6px; flex-shrink:0;";
@@ -343,14 +386,10 @@ function renderQueue() {
   generateBtn.disabled = total === 0;
 }
 
-searchBox.addEventListener("input", () => {
-  const q = searchBox.value.trim();
-  if (!q) {
-    resultsEl.innerHTML = "";
-    return;
-  }
-  renderResults(searchCards(q));
-});
+searchBox.addEventListener("input", runSearch);
+filterAttackDefenseEl.addEventListener("change", runSearch);
+filterRankEl.addEventListener("change", runSearch);
+filterAttributeEl.addEventListener("change", runSearch);
 
 generateBtn.addEventListener("click", () => {
   statusEl.textContent = "PDFを生成中…";
@@ -367,5 +406,6 @@ generateBtn.addEventListener("click", () => {
 });
 
 loadData().then(() => {
+  populateFilterOptions();
   statusEl.textContent = `カードデータ読み込み完了（${allCards.length}件）`;
 });

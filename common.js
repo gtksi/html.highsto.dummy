@@ -44,21 +44,85 @@ function dedupeVariants(matches) {
   return [...seen.values()];
 }
 
+// name/alias/effectNameは検索結果に既に表示されるため、属性・効果本文がヒットした場合のみ
+// 「どこにマッチしたか」の抜粋を返す（それ以外はnull）
+function matchSnippet(card, query) {
+  const q = (query || "").trim();
+  if (!q) return null;
+  if (card.attribute && card.attribute.includes(q)) {
+    return { field: "属性", text: card.attribute };
+  }
+  for (const key of ["effectContent1", "effectContent2"]) {
+    const text = card[key];
+    if (text && text.includes(q)) {
+      const idx = text.indexOf(q);
+      const start = Math.max(0, idx - 8);
+      const end = Math.min(text.length, idx + q.length + 8);
+      const snippet = (start > 0 ? "…" : "") + text.slice(start, end) + (end < text.length ? "…" : "");
+      return { field: "効果文", text: snippet };
+    }
+  }
+  return null;
+}
+
 function findCardByName(name) {
   return allCards.find((c) => c.name === name);
 }
 
-// カード名・通称・能力名の部分一致検索
+// カード名・通称・能力名・属性・効果テキストの部分一致検索
 function searchCards(query) {
-  const q = (query || "").trim();
-  if (!q) return [];
-  return allCards.filter(
-    (c) =>
+  return filterCards({ query });
+}
+
+// 属性・攻撃/防御/事変・ランク/レベルのフィルター選択肢を実データから抽出する
+function getFilterOptions() {
+  const attributeCounts = new Map();
+  const adCounts = new Map();
+  const rankSet = new Set();
+  for (const c of allCards) {
+    if (c.attribute) {
+      for (const token of c.attribute.split("・")) {
+        if (!token) continue;
+        attributeCounts.set(token, (attributeCounts.get(token) || 0) + 1);
+      }
+    }
+    if (c.attackDefense) adCounts.set(c.attackDefense, (adCounts.get(c.attackDefense) || 0) + 1);
+    if (c.rank !== undefined && c.rank !== null && c.rank !== "") rankSet.add(String(c.rank));
+  }
+  const attributes = [...attributeCounts.entries()].sort((a, b) => b[1] - a[1]).map(([token]) => token);
+  const attackDefenses = [...adCounts.entries()].sort((a, b) => b[1] - a[1]).map(([v]) => v);
+  const ranks = [...rankSet].sort((a, b) => Number(a) - Number(b));
+  return { attributes, attackDefenses, ranks };
+}
+
+// 攻を選ぶと「攻」と「両」、防を選ぶと「防」と「両」もヒットさせる（両は攻防兼用のため）。
+// 両・事変は選んだ値そのものだけに厳密一致させる。
+function attackDefenseMatches(cardValue, filterValue) {
+  if (!filterValue) return true;
+  if (filterValue === "攻") return cardValue === "攻" || cardValue === "両";
+  if (filterValue === "防") return cardValue === "防" || cardValue === "両";
+  return cardValue === filterValue; // 両・事変・その他は厳密一致
+}
+
+// query（自由テキスト）と、attribute・attackDefense・rankの構造化フィルターをAND条件で組み合わせる
+function filterCards(criteria = {}) {
+  const q = (criteria.query || "").trim();
+  const { attribute, attackDefense, rank } = criteria;
+  return allCards.filter((c) => {
+    if (attribute && !(c.attribute && c.attribute.split("・").includes(attribute))) return false;
+    if (attackDefense && !attackDefenseMatches(c.attackDefense, attackDefense)) return false;
+    if (rank && String(c.rank) !== String(rank)) return false;
+    if (!q) return true;
+    return (
       (c.name && c.name.includes(q)) ||
       (c.alias && c.alias.includes(q)) ||
       (c.effectName1 && c.effectName1.includes(q)) ||
-      (c.effectName2 && c.effectName2.includes(q))
-  );
+      (c.effectName2 && c.effectName2.includes(q)) ||
+      (c.attribute && c.attribute.includes(q)) ||
+      (c.effectContent1 && c.effectContent1.includes(q)) ||
+      (c.effectContent2 && c.effectContent2.includes(q))
+    );
+  });
 }
 
 // ---------- カード間の参照関係マップ ----------
