@@ -69,6 +69,10 @@ function findCardByName(name) {
   return allCards.find((c) => c.name === name);
 }
 
+function findCardById(cardId) {
+  return allCards.find((c) => c.cardId === cardId);
+}
+
 // カード名・通称・能力名・属性・効果テキストの部分一致検索
 function searchCards(query) {
   return filterCards({ query });

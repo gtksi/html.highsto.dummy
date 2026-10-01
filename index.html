@@ -24,6 +24,16 @@
       <ul id="results" class="results"></ul>
     </section>
 
+    <section class="csv-section">
+      <button id="toggleCsvBtn" type="button" class="csv-toggle">📋 CSVからデッキを一括登録</button>
+      <div id="csvPanel" class="csv-panel" style="display:none">
+        <p class="hint">deck_code / card_id / count 列を含むCSVを貼り付けてください（card_idで照合し、countの枚数だけキューに追加します）。</p>
+        <textarea id="csvInput" rows="6" placeholder="&quot;deck_code&quot;,&quot;deck_name&quot;,&quot;card_name&quot;,...,&quot;count&quot;,...,&quot;card_id&quot;,..."></textarea>
+        <button id="csvImportBtn" type="button">CSVを読み込んでキューに追加</button>
+        <p id="csvStatus" class="status"></p>
+      </div>
+    </section>
+
     <section class="queue-section">
       <h2>選択中のカード <span id="totalCount">(0枚)</span></h2>
       <ul id="queue" class="queue"></ul>

@@ -254,3 +254,38 @@ main {
 #generateBtn:disabled { background: #bbb; cursor: not-allowed; }
 
 .status { text-align: center; color: var(--muted); font-size: 0.85rem; min-height: 1.2em; }
+.result-count { text-align: right; color: var(--muted); font-size: 0.85rem; min-height: 1.2em; margin: 0 0 4px; }
+.result-count.truncated { color: var(--accent, #b45309); font-weight: 600; }
+
+.csv-toggle {
+  width: 100%;
+  text-align: left;
+  border: 1px solid #ccc;
+  background: #fff;
+  color: #222;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+.csv-panel { margin-top: 10px; }
+.csv-panel textarea {
+  width: 100%;
+  font-family: monospace;
+  font-size: 0.75rem;
+  padding: 10px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  resize: vertical;
+  margin: 8px 0;
+}
+.csv-panel button {
+  border: none;
+  background: var(--accent);
+  color: white;
+  padding: 8px 14px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.csv-missing { color: #b45309; font-size: 0.78rem; margin-top: 4px; }

@@ -5,6 +5,8 @@
 const searchBox = document.getElementById("searchBox");
 const resultsEl = document.getElementById("results");
 const statusEl = document.getElementById("status");
+const resultCountEl = document.getElementById("resultCount");
+const RESULT_LIMIT = 30;
 const filterAttackDefenseEl = document.getElementById("filterAttackDefense");
 const filterRankEl = document.getElementById("filterRank");
 const filterAttributeEl = document.getElementById("filterAttribute");
@@ -42,6 +44,8 @@ function runSearch() {
   const hasFilter = criteria.attackDefense || criteria.rank || criteria.attribute;
   if (!q && !hasFilter) {
     resultsEl.innerHTML = "";
+    resultCountEl.textContent = "";
+    resultCountEl.classList.remove("truncated");
     return;
   }
   renderResults(filterCards(criteria), q);
@@ -129,8 +133,20 @@ function wireRefClicks(container) {
 
 function renderResults(matches, query) {
   resultsEl.innerHTML = "";
-  dedupeVariants(matches)
-    .slice(0, 30)
+  const deduped = dedupeVariants(matches);
+  const total = deduped.length;
+  if (total === 0) {
+    resultCountEl.textContent = "該当0件";
+    resultCountEl.classList.remove("truncated");
+  } else if (total > RESULT_LIMIT) {
+    resultCountEl.textContent = `該当${total}件中${RESULT_LIMIT}件を表示（絞り込み条件を追加してください）`;
+    resultCountEl.classList.add("truncated");
+  } else {
+    resultCountEl.textContent = `該当${total}件`;
+    resultCountEl.classList.remove("truncated");
+  }
+  deduped
+    .slice(0, RESULT_LIMIT)
     .forEach((card) => {
       const li = document.createElement("li");
       li.style.cssText = "flex-direction:column; align-items:stretch;";

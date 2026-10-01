@@ -344,12 +344,12 @@ function renderResults(matches, query) {
     });
 }
 
-function addToQueue(card) {
+function addToQueue(card, qty = 1) {
   const existing = queue.find((q) => (q.card.cardId || q.card.name) === (card.cardId || card.name));
   if (existing) {
-    existing.qty += 1;
+    existing.qty += qty;
   } else {
-    queue.push({ card, qty: 1 });
+    queue.push({ card, qty });
   }
   renderQueue();
 }
@@ -403,6 +403,130 @@ generateBtn.addEventListener("click", () => {
     statusEl.textContent = `完了：${cardList.length}枚を出力しました`;
     generateBtn.disabled = false;
   }, 50);
+});
+
+// ---------- CSV一括登録（deck_code / card_id / count 列を持つエクスポートCSVを想定） ----------
+
+// RFC4180準拠の簡易CSVパーサー（引用符内の改行・カンマ・""エスケープに対応）
+function parseCSV(text) {
+  const rows = [];
+  let row = [];
+  let field = "";
+  let inQuotes = false;
+  const s = text.replace(/^\uFEFF/, ""); // BOM除去
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (inQuotes) {
+      if (ch === '"') {
+        if (s[i + 1] === '"') {
+          field += '"';
+          i++;
+        } else {
+          inQuotes = false;
+        }
+      } else {
+        field += ch;
+      }
+    } else if (ch === '"') {
+      inQuotes = true;
+    } else if (ch === ",") {
+      row.push(field);
+      field = "";
+    } else if (ch === "\n" || ch === "\r") {
+      if (ch === "\r" && s[i + 1] === "\n") i++;
+      row.push(field);
+      field = "";
+      if (row.some((c) => c !== "")) rows.push(row);
+      row = [];
+    } else {
+      field += ch;
+    }
+  }
+  if (field !== "" || row.length) {
+    row.push(field);
+    if (row.some((c) => c !== "")) rows.push(row);
+  }
+  if (!rows.length) return [];
+  const header = rows[0];
+  return rows.slice(1).map((r) => {
+    const obj = {};
+    header.forEach((h, idx) => (obj[h] = r[idx] ?? ""));
+    return obj;
+  });
+}
+
+function importCSV(text) {
+  let records;
+  try {
+    records = parseCSV(text);
+  } catch (e) {
+    csvStatusEl.textContent = "CSVの解析に失敗しました。形式をご確認ください。";
+    return;
+  }
+  if (!records.length) {
+    csvStatusEl.textContent = "有効な行が見つかりませんでした。";
+    return;
+  }
+
+  // 同一card_idが複数行にまたがる場合はcountを合算する
+  const grouped = new Map(); // cardId -> { count, name }
+  const missing = [];
+  for (const r of records) {
+    const cardId = (r.card_id || "").trim();
+    const count = parseInt(r.count, 10) || 0;
+    if (!cardId || count <= 0) continue;
+    if (grouped.has(cardId)) {
+      grouped.get(cardId).count += count;
+    } else {
+      grouped.set(cardId, { count, name: r.card_name || cardId });
+    }
+  }
+
+  let addedCards = 0;
+  let addedCount = 0;
+  for (const [cardId, info] of grouped) {
+    const card = findCardById(cardId);
+    if (!card) {
+      missing.push(`${info.name}（${cardId}）`);
+      continue;
+    }
+    addToQueue(card, info.count);
+    addedCards++;
+    addedCount += info.count;
+  }
+
+  const deckCode = records[0].deck_code ? `デッキコード「${records[0].deck_code}」／` : "";
+  let msg = `${deckCode}${addedCards}種類・${addedCount}枚をキューに追加しました。`;
+  if (missing.length) {
+    msg += ` （カードDBに見つからず未登録：${missing.length}件）`;
+  }
+  csvStatusEl.textContent = msg;
+  if (missing.length) {
+    const detail = document.createElement("div");
+    detail.className = "csv-missing";
+    detail.textContent = "未登録：" + missing.join("、");
+    csvStatusEl.appendChild(document.createElement("br"));
+    csvStatusEl.appendChild(detail);
+  }
+}
+
+const toggleCsvBtn = document.getElementById("toggleCsvBtn");
+const csvPanel = document.getElementById("csvPanel");
+const csvInput = document.getElementById("csvInput");
+const csvImportBtn = document.getElementById("csvImportBtn");
+const csvStatusEl = document.getElementById("csvStatus");
+
+toggleCsvBtn.addEventListener("click", () => {
+  csvPanel.style.display = csvPanel.style.display === "none" ? "block" : "none";
+});
+
+csvImportBtn.addEventListener("click", () => {
+  const text = csvInput.value.trim();
+  if (!text) {
+    csvStatusEl.textContent = "CSVを貼り付けてください。";
+    return;
+  }
+  importCSV(text);
 });
 
 loadData().then(() => {
