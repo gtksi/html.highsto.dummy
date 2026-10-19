@@ -4,6 +4,9 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Hi!story 代理カードメモ ジェネレーター</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -22,6 +25,18 @@
         <select id="filterAttribute"><option value="">属性：すべて</option></select>
       </div>
       <ul id="results" class="results"></ul>
+    </section>
+
+    <section class="marker-section">
+      <button id="toggleMarkerBtn" type="button" class="csv-toggle">⛔ 状態異常マーカーを作成</button>
+      <div id="markerPanel" class="csv-panel" style="display:none">
+        <p class="hint">「追加」で選択中のカードに加わり、代理カードと同じA4シートに印刷できます。</p>
+        <ul id="markerList" class="marker-list"></ul>
+        <div class="marker-custom">
+          <input id="markerCustomInput" type="text" placeholder="自由入力（改行は / で指定　例：ランク3以上を/セットできない）" autocomplete="off" />
+          <button id="markerCustomBtn" type="button">追加</button>
+        </div>
+      </div>
     </section>
 
     <section class="csv-section">

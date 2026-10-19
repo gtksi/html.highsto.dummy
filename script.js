@@ -74,7 +74,7 @@ function drawCard(canvas, card) {
   const fEffBody = Math.round(CANVAS_W * 0.034);
   const fFlavor = Math.round(CANVAS_W * 0.027);
   const fFoot = Math.round(CANVAS_W * 0.021);
-  const FONT = "'Hiragino Sans','Noto Sans JP','Yu Gothic',sans-serif";
+  const FONT = CARD_FONT;
 
   // ランクバッジ
   ctx.font = `bold ${fSmall}px ${FONT}`;
@@ -198,13 +198,137 @@ function roundRect(ctx, x, y, w, h, r) {
   ctx.stroke();
 }
 
+
+// ---------- 状態異常マーカー（カードサイズ） ----------
+// cards.json の効果文で頻出する「〜できない」系の制限表現から作成。
+// lines は表示時の改行位置（見やすさ優先で明示指定）。
+const MARKER_PRESETS = [
+  { category: "攻撃制限", lines: ["攻撃", "できない"] },
+  { category: "攻撃制限", lines: ["1回までしか", "攻撃できない"] },
+  { category: "攻撃制限", lines: ["2回までしか", "攻撃できない"] },
+  { category: "攻撃制限", lines: ["山札に", "攻撃できない"] },
+  { category: "攻撃制限", lines: ["ブロック", "できない"] },
+  { category: "セット・召喚制限", lines: ["セット", "できない"] },
+  { category: "セット・召喚制限", lines: ["1枚までしか", "セットできない"] },
+  { category: "セット・召喚制限", lines: ["ランク2以上を", "セットできない"] },
+  { category: "セット・召喚制限", lines: ["召喚", "できない"] },
+  { category: "セット・召喚制限", lines: ["セットせずに", "召喚できない"] },
+  { category: "セット・召喚制限", lines: ["セット・召喚", "できない"] },
+  { category: "セット・召喚制限", lines: ["ランク1以上を", "セットせずに", "召喚できない"] },
+  { category: "セット・召喚制限", lines: ["ランク2以上を", "セットせずに", "召喚できない"] },
+  { category: "その他の制限", lines: ["アクティブに", "できない"] },
+  { category: "その他の制限", lines: ["「召」の効果は", "発動できない"] },
+  { category: "その他の制限", lines: ["｛身代わり｝を", "発動できない"] },
+];
+
+function makeMarkerCard(category, lines) {
+  const text = lines.join("");
+  return {
+    isMarker: true,
+    cardId: `marker:${category}:${text}`,
+    name: `【マーカー】${text}`,
+    markerCategory: category,
+    markerLines: lines,
+  };
+}
+
+// 禁止マーク（円＋斜線）をキャンバスに描く
+function drawProhibitSign(ctx, cx, cy, r) {
+  ctx.strokeStyle = "#000";
+  ctx.lineWidth = Math.round(r * 0.2);
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.stroke();
+  const d = r * Math.SQRT1_2;
+  ctx.beginPath();
+  ctx.moveTo(cx - d, cy - d);
+  ctx.lineTo(cx + d, cy + d);
+  ctx.stroke();
+}
+
+function drawMarker(canvas, card) {
+  const ctx = canvas.getContext("2d");
+  const FONT = CARD_FONT;
+  ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+
+  // 外枠（切り取り基準。通常カードと同じ）
+  ctx.strokeStyle = "#000000";
+  ctx.lineWidth = 4;
+  ctx.strokeRect(6, 6, CANVAS_W - 12, CANVAS_H - 12);
+
+  ctx.textBaseline = "top";
+  ctx.textAlign = "center";
+
+  // 上部：カテゴリ名
+  const fCat = Math.round(CANVAS_W * 0.05);
+  ctx.font = `bold ${fCat}px ${FONT}`;
+  ctx.fillStyle = "#444";
+  ctx.fillText(card.markerCategory || "状態マーカー", CANVAS_W / 2, MARGIN + 14);
+
+  // 中央上：禁止マーク
+  drawProhibitSign(ctx, CANVAS_W / 2, 290, 150);
+
+  // 下部：文言（最も長い行が枠に収まるようフォントを自動調整）
+  const maxW = CANVAS_W - 2 * MARGIN - 10;
+  let fs = Math.round(CANVAS_W * 0.12);
+  const lines = card.markerLines;
+  while (fs > 24) {
+    ctx.font = `bold ${fs}px ${FONT}`;
+    if (Math.max(...lines.map((l) => ctx.measureText(l).width)) <= maxW) break;
+    fs -= 2;
+  }
+  const lh = Math.round(fs * 1.3);
+  const blockH = lines.length * lh;
+  let y = 520 + Math.max(0, (260 - blockH) / 2);
+  ctx.fillStyle = "#000";
+  for (const line of lines) {
+    ctx.fillText(line, CANVAS_W / 2, y);
+    y += lh;
+  }
+
+  // フッター
+  const fFoot = Math.round(CANVAS_W * 0.021);
+  ctx.font = `${fFoot}px ${FONT}`;
+  ctx.fillStyle = "#969696";
+  ctx.fillText("※状態マーカー（プレイ用）", CANVAS_W / 2, CANVAS_H - fFoot - 14);
+  ctx.textAlign = "start";
+}
+
+// ---------- フォント（ユニバーサルデザイン書体：BIZ UDPゴシック） ----------
+// 見分けやすさを重視したUD書体（セリフなし）。Google Fontsから配信し、未取得時は従来のゴシック体にフォールバック。
+const CARD_FONT = "'BIZ UDPGothic','BIZ UDGothic','Hiragino Sans','Noto Sans JP','Yu Gothic',sans-serif";
+
+// 描画前に、使用する文字を含むフォント分割(subset)を確実に読み込む（canvasは自動でWebフォントを待たないため）
+async function ensureFonts(cards) {
+  if (!document.fonts || !document.fonts.load) return true;
+  const text = Array.from(new Set(cards.flatMap((c) =>
+    Object.values(c).filter((v) => typeof v === "string").join("").concat((c.markerLines || []).join(""))
+  ).join(""))).join("");
+  const sample = text.slice(0, 3000) + "0123456789あいうアイウ漢字";
+  try {
+    await Promise.race([
+      Promise.all([
+        document.fonts.load(`16px 'BIZ UDPGothic'`, sample),
+        document.fonts.load(`bold 16px 'BIZ UDPGothic'`, sample),
+      ]),
+      new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), 8000)),
+    ]);
+    return document.fonts.check(`16px 'BIZ UDPGothic'`);
+  } catch (e) {
+    return false;
+  }
+}
+
 // ---------- カード画像キャッシュ ----------
 const imageCache = new Map();
 function getCardDataURL(card) {
   const key = card.cardId || card.name;
   if (imageCache.has(key)) return imageCache.get(key);
   const canvas = document.getElementById("workCanvas");
-  drawCard(canvas, card);
+  if (card.isMarker) drawMarker(canvas, card);
+  else drawCard(canvas, card);
   const url = canvas.toDataURL("image/png");
   imageCache.set(key, url);
   return url;
@@ -391,19 +515,64 @@ filterAttackDefenseEl.addEventListener("change", runSearch);
 filterRankEl.addEventListener("change", runSearch);
 filterAttributeEl.addEventListener("change", runSearch);
 
-generateBtn.addEventListener("click", () => {
-  statusEl.textContent = "PDFを生成中…";
+generateBtn.addEventListener("click", async () => {
+  statusEl.textContent = "PDFを生成中…（フォント読み込み）";
   generateBtn.disabled = true;
-  setTimeout(() => {
-    const cardList = [];
-    queue.forEach((entry) => {
-      for (let i = 0; i < entry.qty; i++) cardList.push(entry.card);
-    });
-    buildPDF(cardList);
-    statusEl.textContent = `完了：${cardList.length}枚を出力しました`;
-    generateBtn.disabled = false;
-  }, 50);
+  const cardList = [];
+  queue.forEach((entry) => {
+    for (let i = 0; i < entry.qty; i++) cardList.push(entry.card);
+  });
+  const fontOk = await ensureFonts(queue.map((e) => e.card));
+  buildPDF(cardList);
+  statusEl.textContent = `完了：${cardList.length}枚を出力しました` +
+    (fontOk ? "" : "（UD書体を取得できなかったため、標準ゴシック体で出力）");
+  generateBtn.disabled = false;
 });
+
+// ---------- 状態異常マーカー UI ----------
+const toggleMarkerBtn = document.getElementById("toggleMarkerBtn");
+const markerPanel = document.getElementById("markerPanel");
+const markerListEl = document.getElementById("markerList");
+const markerCustomInput = document.getElementById("markerCustomInput");
+const markerCustomBtn = document.getElementById("markerCustomBtn");
+
+function renderMarkerList() {
+  markerListEl.innerHTML = "";
+  let lastCategory = "";
+  for (const preset of MARKER_PRESETS) {
+    if (preset.category !== lastCategory) {
+      const h = document.createElement("li");
+      h.className = "marker-heading";
+      h.textContent = preset.category;
+      markerListEl.appendChild(h);
+      lastCategory = preset.category;
+    }
+    const li = document.createElement("li");
+    const label = document.createElement("span");
+    label.textContent = preset.lines.join("");
+    const btn = document.createElement("button");
+    btn.textContent = "追加";
+    btn.onclick = () => addToQueue(makeMarkerCard(preset.category, preset.lines));
+    li.appendChild(label);
+    li.appendChild(btn);
+    markerListEl.appendChild(li);
+  }
+}
+
+toggleMarkerBtn.addEventListener("click", () => {
+  markerPanel.style.display = markerPanel.style.display === "none" ? "block" : "none";
+});
+
+// 自由入力：改行位置は「/」で指定（例：次のターン/攻撃できない）。省略時は全体を1行として自動縮小
+markerCustomBtn.addEventListener("click", () => {
+  const raw = markerCustomInput.value.trim();
+  if (!raw) return;
+  const lines = raw.split("/").map((l) => l.trim()).filter(Boolean).slice(0, 5);
+  addToQueue(makeMarkerCard("カスタム", lines));
+  markerCustomInput.value = "";
+});
+
+renderMarkerList();
 
 // ---------- CSV一括登録（deck_code / card_id / count 列を持つエクスポートCSVを想定） ----------
 

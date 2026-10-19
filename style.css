@@ -8,7 +8,7 @@
 * { box-sizing: border-box; }
 
 body {
-  font-family: "Hiragino Sans", "Noto Sans JP", "Yu Gothic", sans-serif;
+  font-family: "BIZ UDPGothic", "Hiragino Sans", "Noto Sans JP", "Yu Gothic", sans-serif;
   margin: 0;
   background: var(--bg);
   color: #222;
@@ -289,3 +289,10 @@ main {
   cursor: pointer;
 }
 .csv-missing { color: #b45309; font-size: 0.78rem; margin-top: 4px; }
+
+.marker-list { list-style: none; margin: 8px 0; padding: 0; }
+.marker-list li { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 0; border-bottom: 1px solid #eee; font-size: 0.9rem; }
+.marker-list li.marker-heading { font-weight: 600; color: var(--muted); font-size: 0.78rem; border-bottom: 1px solid #ccc; padding-top: 12px; }
+.marker-list button, .marker-custom button { border: none; background: var(--accent); color: white; padding: 6px 12px; border-radius: 6px; font-size: 0.85rem; cursor: pointer; }
+.marker-custom { display: flex; gap: 8px; margin-top: 8px; }
+.marker-custom input { flex: 1; padding: 8px 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 0.85rem; }
