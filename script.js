@@ -246,53 +246,67 @@ function drawProhibitSign(ctx, cx, cy, r) {
   ctx.stroke();
 }
 
+// マーカーは横向き（88×63mm）。通常カードを90度回した向きに置いて使う想定
+const MARKER_W = CARD_H_MM * SCALE; // 880
+const MARKER_H = CARD_W_MM * SCALE; // 630
+
 function drawMarker(canvas, card) {
+  canvas.width = MARKER_W;
+  canvas.height = MARKER_H;
   const ctx = canvas.getContext("2d");
   const FONT = CARD_FONT;
-  ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
+  ctx.clearRect(0, 0, MARKER_W, MARKER_H);
   ctx.fillStyle = "#ffffff";
-  ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+  ctx.fillRect(0, 0, MARKER_W, MARKER_H);
 
   // 外枠（切り取り基準。通常カードと同じ）
   ctx.strokeStyle = "#000000";
   ctx.lineWidth = 4;
-  ctx.strokeRect(6, 6, CANVAS_W - 12, CANVAS_H - 12);
+  ctx.strokeRect(6, 6, MARKER_W - 12, MARKER_H - 12);
 
   ctx.textBaseline = "top";
   ctx.textAlign = "center";
 
-  // 上部：カテゴリ名
-  const fCat = Math.round(CANVAS_W * 0.05);
+  // 左：禁止マーク
+  drawProhibitSign(ctx, 200, MARKER_H / 2 - 8, 130);
+
+  // 右：カテゴリ名＋文言
+  const zoneL = 380;
+  const zoneR = MARKER_W - MARGIN;
+  const zoneCx = (zoneL + zoneR) / 2;
+  const fCat = Math.round(MARKER_H * 0.06);
   ctx.font = `bold ${fCat}px ${FONT}`;
   ctx.fillStyle = "#444";
-  ctx.fillText(card.markerCategory || "状態マーカー", CANVAS_W / 2, MARGIN + 14);
+  ctx.fillText(card.markerCategory || "状態マーカー", zoneCx, MARGIN + 6);
 
-  // 中央上：禁止マーク
-  drawProhibitSign(ctx, CANVAS_W / 2, 290, 150);
-
-  // 下部：文言（最も長い行が枠に収まるようフォントを自動調整）
-  const maxW = CANVAS_W - 2 * MARGIN - 10;
-  let fs = Math.round(CANVAS_W * 0.12);
+  // 文言（最も長い行が右ゾーンに収まるようフォントを自動調整）
+  const maxW = zoneR - zoneL - 10;
   const lines = card.markerLines;
+  let fs = 104;
   while (fs > 24) {
     ctx.font = `bold ${fs}px ${FONT}`;
     if (Math.max(...lines.map((l) => ctx.measureText(l).width)) <= maxW) break;
     fs -= 2;
   }
-  const lh = Math.round(fs * 1.3);
+  // 行数が多いときは縦に収まるよう、さらに縮小
+  const textTop = MARGIN + fCat + 30;
+  const textH = MARKER_H - MARGIN - 40 - textTop;
+  while (fs > 24 && lines.length * Math.round(fs * 1.25) > textH) fs -= 2;
+  ctx.font = `bold ${fs}px ${FONT}`;
+  const lh = Math.round(fs * 1.25);
   const blockH = lines.length * lh;
-  let y = 520 + Math.max(0, (260 - blockH) / 2);
+  let y = textTop + Math.max(0, (textH - blockH) / 2);
   ctx.fillStyle = "#000";
   for (const line of lines) {
-    ctx.fillText(line, CANVAS_W / 2, y);
+    ctx.fillText(line, zoneCx, y);
     y += lh;
   }
 
   // フッター
-  const fFoot = Math.round(CANVAS_W * 0.021);
+  const fFoot = Math.round(MARKER_H * 0.03);
   ctx.font = `${fFoot}px ${FONT}`;
   ctx.fillStyle = "#969696";
-  ctx.fillText("※状態マーカー（プレイ用）", CANVAS_W / 2, CANVAS_H - fFoot - 14);
+  ctx.fillText("※状態マーカー（プレイ用）", MARKER_W / 2, MARKER_H - fFoot - 14);
   ctx.textAlign = "start";
 }
 
@@ -327,40 +341,56 @@ function getCardDataURL(card) {
   const key = card.cardId || card.name;
   if (imageCache.has(key)) return imageCache.get(key);
   const canvas = document.getElementById("workCanvas");
-  if (card.isMarker) drawMarker(canvas, card);
-  else drawCard(canvas, card);
+  if (card.isMarker) {
+    drawMarker(canvas, card);
+  } else {
+    canvas.width = CANVAS_W;
+    canvas.height = CANVAS_H;
+    drawCard(canvas, card);
+  }
   const url = canvas.toDataURL("image/png");
   imageCache.set(key, url);
   return url;
 }
 
 // ---------- PDF生成 ----------
+// 1種類のカード群を、指定グリッドでページ送りしながら配置する
+function placeGrid(pdf, items, g, isFirstPage) {
+  const gridW = g.cols * g.cellW + (g.cols - 1) * GAP_MM;
+  const gridH = g.rows * g.cellH + (g.rows - 1) * GAP_MM;
+  const marginX = (PAGE_W_MM - gridW) / 2;
+  const marginY = (PAGE_H_MM - gridH) / 2;
+  const drawW = g.cellW - 2 * g.shrinkX;
+  const drawH = g.cellH - 2 * g.shrinkY;
+  const perPage = g.cols * g.rows;
+  for (let start = 0; start < items.length; start += perPage) {
+    if (!(isFirstPage && start === 0)) pdf.addPage();
+    items.slice(start, start + perPage).forEach((card, i) => {
+      const col = i % g.cols;
+      const row = Math.floor(i / g.cols);
+      const x = marginX + col * (g.cellW + GAP_MM) + g.shrinkX;
+      const y = marginY + row * (g.cellH + GAP_MM) + g.shrinkY;
+      pdf.addImage(getCardDataURL(card), "PNG", x, y, drawW, drawH);
+    });
+  }
+}
+
 function buildPDF(cardList) {
   const { jsPDF } = window.jspdf;
   const pdf = new jsPDF({ unit: "mm", format: "a4" });
 
-  const gridW = COLS * CARD_W_MM + (COLS - 1) * GAP_MM;
-  const gridH = ROWS * CARD_H_MM + (ROWS - 1) * GAP_MM;
-  const marginX = (PAGE_W_MM - gridW) / 2;
-  const marginY = (PAGE_H_MM - gridH) / 2;
-  const drawW = CARD_W_MM - 2 * SHRINK_X_MM;
-  const drawH = CARD_H_MM - 2 * SHRINK_Y_MM;
+  const normals = cardList.filter((c) => !c.isMarker);
+  const markers = cardList.filter((c) => c.isMarker);
 
-  const perPage = COLS * ROWS;
-  for (let start = 0; start < cardList.length; start += perPage) {
-    if (start > 0) pdf.addPage();
-    const chunk = cardList.slice(start, start + perPage);
-    chunk.forEach((card, i) => {
-      const col = i % COLS;
-      const row = Math.floor(i / COLS);
-      const cellX = marginX + col * (CARD_W_MM + GAP_MM);
-      const cellY = marginY + row * (CARD_H_MM + GAP_MM);
-      const x = cellX + SHRINK_X_MM;
-      const y = cellY + SHRINK_Y_MM;
-      const dataUrl = getCardDataURL(card);
-      pdf.addImage(dataUrl, "PNG", x, y, drawW, drawH);
-    });
-  }
+  // 通常カード：縦向き 3×3＝9枚/ページ（仕上がり59×80mm）
+  placeGrid(pdf, normals,
+    { cols: COLS, rows: ROWS, cellW: CARD_W_MM, cellH: CARD_H_MM, shrinkX: SHRINK_X_MM, shrinkY: SHRINK_Y_MM },
+    true);
+  // マーカー：横向き 2×4＝8枚/ページ（縮小量も90度回して仕上がり80×59mm）。通常カードとはページを分ける
+  placeGrid(pdf, markers,
+    { cols: 2, rows: 4, cellW: CARD_H_MM, cellH: CARD_W_MM, shrinkX: SHRINK_Y_MM, shrinkY: SHRINK_X_MM },
+    normals.length === 0);
+
   pdf.save("highsto_proxy_memo.pdf");
 }
 
