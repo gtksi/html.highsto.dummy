@@ -296,3 +296,10 @@ main {
 .marker-list button, .marker-custom button { border: none; background: var(--accent); color: white; padding: 6px 12px; border-radius: 6px; font-size: 0.85rem; cursor: pointer; }
 .marker-custom { display: flex; gap: 8px; margin-top: 8px; }
 .marker-custom input { flex: 1; padding: 8px 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 0.85rem; }
+
+.marker-settings { display: flex; gap: 14px; align-items: flex-start; margin: 10px 0; }
+.marker-preview { width: 126px; height: 176px; border: 1px solid #ccc; background: #fff; flex: none; }
+.marker-settings-controls { display: flex; flex-direction: column; gap: 8px; font-size: 0.85rem; min-width: 0; }
+.marker-settings-controls label { display: flex; flex-direction: column; gap: 3px; }
+.marker-settings-controls input[type="file"] { max-width: 100%; font-size: 0.8rem; }
+.marker-settings-controls .secondary { background: #fff; color: #222; border: 1px solid #ccc; align-self: flex-start; }

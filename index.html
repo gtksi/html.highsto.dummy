@@ -28,9 +28,29 @@
     </section>
 
     <section class="marker-section">
-      <button id="toggleMarkerBtn" type="button" class="csv-toggle">⛔ 状態異常マーカーを作成</button>
+      <button id="toggleMarkerBtn" type="button" class="csv-toggle">⛔ マーカーを作成（状態異常・先攻後攻）</button>
       <div id="markerPanel" class="csv-panel" style="display:none">
-        <p class="hint">「追加」で選択中のカードに加わり、代理カードと同じA4シートに印刷できます。</p>
+        <p class="hint">「追加」でキューに加わり、代理カードと同じサイズ・同じA4シートに印刷できます。</p>
+        <div class="marker-settings">
+          <img id="markerPreview" class="marker-preview" alt="マーカーのプレビュー" />
+          <div class="marker-settings-controls">
+            <label>文字の向き
+              <select id="markerRotation">
+                <option value="90">右に90°（上から下へ読む）</option>
+                <option value="-90">左に90°（下から上へ読む）</option>
+              </select>
+            </label>
+            <label>背景画像
+              <input id="markerBgInput" type="file" accept="image/*" />
+            </label>
+            <label>背景の濃さ
+              <input id="markerBgOpacity" type="range" min="5" max="60" step="5" value="25" />
+              <span id="markerBgOpacityVal">25%</span>
+            </label>
+            <button id="markerBgClearBtn" type="button" class="secondary">背景を削除</button>
+            <p id="markerBgStatus" class="hint"></p>
+          </div>
+        </div>
         <ul id="markerList" class="marker-list"></ul>
         <div class="marker-custom">
           <input id="markerCustomInput" type="text" placeholder="自由入力（改行は / で指定　例：ランク3以上を/セットできない）" autocomplete="off" />

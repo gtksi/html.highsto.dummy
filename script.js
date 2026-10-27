@@ -199,10 +199,12 @@ function roundRect(ctx, x, y, w, h, r) {
 }
 
 
-// ---------- 状態異常マーカー（カードサイズ） ----------
-// cards.json の効果文で頻出する「〜できない」系の制限表現から作成。
-// lines は表示時の改行位置（見やすさ優先で明示指定）。
+// ---------- マーカー（状態異常／先攻・後攻） ----------
+// 通常カードと同サイズ(63×88mm)の縦長カード。文字は横長レイアウトで描いて90度回転して載せる。
+// 状態異常は cards.json の効果文で頻出する「〜できない」系の制限表現から作成。lines は表示時の改行位置。
 const MARKER_PRESETS = [
+  { category: "先攻・後攻", style: "turn", variant: "first", lines: ["先攻"] },
+  { category: "先攻・後攻", style: "turn", variant: "second", lines: ["後攻"] },
   { category: "攻撃制限", lines: ["攻撃", "できない"] },
   { category: "攻撃制限", lines: ["1回までしか", "攻撃できない"] },
   { category: "攻撃制限", lines: ["2回までしか", "攻撃できない"] },
@@ -221,7 +223,14 @@ const MARKER_PRESETS = [
   { category: "その他の制限", lines: ["｛身代わり｝を", "発動できない"] },
 ];
 
-function makeMarkerCard(category, lines) {
+// マーカーの表示設定（画面のパネルから変更）
+const markerSettings = {
+  rotation: 90, // 文字の向き：90＝右に90度（上から下へ読む）、-90＝左に90度
+  bgOpacity: 0.25, // 背景画像の濃さ（0〜1）
+  bgCanvas: null, // グレースケール化・カードサイズにリサイズ済みの背景
+};
+
+function makeMarkerCard(category, lines, style = "forbid", variant = "") {
   const text = lines.join("");
   return {
     isMarker: true,
@@ -229,6 +238,8 @@ function makeMarkerCard(category, lines) {
     name: `【マーカー】${text}`,
     markerCategory: category,
     markerLines: lines,
+    markerStyle: style,
+    markerVariant: variant,
   };
 }
 
@@ -246,68 +257,163 @@ function drawProhibitSign(ctx, cx, cy, r) {
   ctx.stroke();
 }
 
-// マーカーは横向き（88×63mm）。通常カードを90度回した向きに置いて使う想定
+// 先攻＝黒丸（塗りつぶし）、後攻＝白丸（太枠）。白黒印刷でも区別できる
+function drawTurnBadge(ctx, cx, cy, r, first) {
+  if (first) {
+    ctx.fillStyle = "#000";
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fill();
+  } else {
+    const lw = Math.round(r * 0.2);
+    ctx.strokeStyle = "#000";
+    ctx.lineWidth = lw;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r - lw / 2, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+}
+
+// 横長レイアウト(880×630)でマーカーの中身を描く（外枠・背景は呼び出し側）
 const MARKER_W = CARD_H_MM * SCALE; // 880
 const MARKER_H = CARD_W_MM * SCALE; // 630
-
-function drawMarker(canvas, card) {
-  canvas.width = MARKER_W;
-  canvas.height = MARKER_H;
-  const ctx = canvas.getContext("2d");
+function drawMarkerContent(ctx, card) {
   const FONT = CARD_FONT;
-  ctx.clearRect(0, 0, MARKER_W, MARKER_H);
-  ctx.fillStyle = "#ffffff";
-  ctx.fillRect(0, 0, MARKER_W, MARKER_H);
-
-  // 外枠（切り取り基準。通常カードと同じ）
-  ctx.strokeStyle = "#000000";
-  ctx.lineWidth = 4;
-  ctx.strokeRect(6, 6, MARKER_W - 12, MARKER_H - 12);
-
+  const isTurn = card.markerStyle === "turn";
+  const hasBg = !!markerSettings.bgCanvas;
   ctx.textBaseline = "top";
   ctx.textAlign = "center";
 
-  // 左：禁止マーク
-  drawProhibitSign(ctx, 200, MARKER_H / 2 - 8, 130);
+  // 左：禁止マーク／先攻後攻バッジ
+  if (isTurn) drawTurnBadge(ctx, 200, MARKER_H / 2 - 8, 130, card.markerVariant === "first");
+  else drawProhibitSign(ctx, 200, MARKER_H / 2 - 8, 130);
+
+  ctx.textBaseline = "top";
+  ctx.textAlign = "center";
 
   // 右：カテゴリ名＋文言
   const zoneL = 380;
   const zoneR = MARKER_W - MARGIN;
   const zoneCx = (zoneL + zoneR) / 2;
   const fCat = Math.round(MARKER_H * 0.06);
+  const drawText = (t, x, y, color) => {
+    if (hasBg) {
+      // 背景画像の上でも読めるよう白フチを付ける
+      ctx.lineJoin = "round";
+      ctx.lineWidth = 10;
+      ctx.strokeStyle = "#fff";
+      ctx.strokeText(t, x, y);
+    }
+    ctx.fillStyle = color;
+    ctx.fillText(t, x, y);
+  };
   ctx.font = `bold ${fCat}px ${FONT}`;
-  ctx.fillStyle = "#444";
-  ctx.fillText(card.markerCategory || "状態マーカー", zoneCx, MARGIN + 6);
+  drawText(card.markerCategory || "マーカー", zoneCx, MARGIN + 6, "#444");
 
   // 文言（最も長い行が右ゾーンに収まるようフォントを自動調整）
   const maxW = zoneR - zoneL - 10;
   const lines = card.markerLines;
-  let fs = 104;
+  let fs = isTurn ? 190 : 104;
   while (fs > 24) {
     ctx.font = `bold ${fs}px ${FONT}`;
     if (Math.max(...lines.map((l) => ctx.measureText(l).width)) <= maxW) break;
     fs -= 2;
   }
-  // 行数が多いときは縦に収まるよう、さらに縮小
   const textTop = MARGIN + fCat + 30;
   const textH = MARKER_H - MARGIN - 40 - textTop;
   while (fs > 24 && lines.length * Math.round(fs * 1.25) > textH) fs -= 2;
   ctx.font = `bold ${fs}px ${FONT}`;
   const lh = Math.round(fs * 1.25);
-  const blockH = lines.length * lh;
-  let y = textTop + Math.max(0, (textH - blockH) / 2);
-  ctx.fillStyle = "#000";
+  let y = textTop + Math.max(0, (textH - lines.length * lh) / 2);
   for (const line of lines) {
-    ctx.fillText(line, zoneCx, y);
+    drawText(line, zoneCx, y, "#000");
     y += lh;
   }
 
   // フッター
   const fFoot = Math.round(MARKER_H * 0.03);
   ctx.font = `${fFoot}px ${FONT}`;
-  ctx.fillStyle = "#969696";
-  ctx.fillText("※状態マーカー（プレイ用）", MARKER_W / 2, MARKER_H - fFoot - 14);
+  drawText(`※${isTurn ? "先攻・後攻" : "状態"}マーカー（プレイ用）`, MARKER_W / 2, MARKER_H - fFoot - 14, "#8a8a8a");
   ctx.textAlign = "start";
+}
+
+function drawMarker(canvas, card) {
+  const ctx = canvas.getContext("2d");
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+
+  // 背景画像（グレースケール化済み。薄く重ねる）
+  if (markerSettings.bgCanvas) {
+    ctx.globalAlpha = markerSettings.bgOpacity;
+    ctx.drawImage(markerSettings.bgCanvas, 0, 0, CANVAS_W, CANVAS_H);
+    ctx.globalAlpha = 1;
+  }
+
+  // 外枠（切り取り基準。通常カードと同じで、回転しない）
+  ctx.strokeStyle = "#000000";
+  ctx.lineWidth = 4;
+  ctx.strokeRect(6, 6, CANVAS_W - 12, CANVAS_H - 12);
+
+  // 中身は横長で描いて、縦長カードに90度回転して載せる
+  ctx.save();
+  if (markerSettings.rotation === -90) {
+    ctx.translate(0, CANVAS_H);
+    ctx.rotate(-Math.PI / 2);
+  } else {
+    ctx.translate(CANVAS_W, 0);
+    ctx.rotate(Math.PI / 2);
+  }
+  drawMarkerContent(ctx, card);
+  ctx.restore();
+}
+
+// アップロード画像 → グレースケール化＋カードサイズ(630×880)に「全面を覆う」リサイズ（はみ出しは中央でトリミング）
+function setMarkerBackground(img) {
+  const c = document.createElement("canvas");
+  c.width = CANVAS_W;
+  c.height = CANVAS_H;
+  const x = c.getContext("2d");
+  x.fillStyle = "#fff"; // 透過PNGは白地に合成
+  x.fillRect(0, 0, CANVAS_W, CANVAS_H);
+  const iw = img.naturalWidth || img.width;
+  const ih = img.naturalHeight || img.height;
+  const sc = Math.max(CANVAS_W / iw, CANVAS_H / ih);
+  const w = iw * sc;
+  const h = ih * sc;
+  x.drawImage(img, (CANVAS_W - w) / 2, (CANVAS_H - h) / 2, w, h);
+  const d = x.getImageData(0, 0, CANVAS_W, CANVAS_H);
+  const p = d.data;
+  for (let i = 0; i < p.length; i += 4) {
+    const g = Math.round(0.299 * p[i] + 0.587 * p[i + 1] + 0.114 * p[i + 2]);
+    p[i] = p[i + 1] = p[i + 2] = g;
+    p[i + 3] = 255;
+  }
+  x.putImageData(d, 0, 0);
+  markerSettings.bgCanvas = c;
+}
+
+function loadMarkerBackground(file) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      try {
+        setMarkerBackground(img);
+        resolve();
+      } catch (e) {
+        reject(e);
+      } finally {
+        URL.revokeObjectURL(url);
+      }
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("画像を読み込めませんでした"));
+    };
+    img.src = url;
+  });
 }
 
 // ---------- フォント（ユニバーサルデザイン書体：BIZ UDPゴシック） ----------
@@ -341,56 +447,40 @@ function getCardDataURL(card) {
   const key = card.cardId || card.name;
   if (imageCache.has(key)) return imageCache.get(key);
   const canvas = document.getElementById("workCanvas");
-  if (card.isMarker) {
-    drawMarker(canvas, card);
-  } else {
-    canvas.width = CANVAS_W;
-    canvas.height = CANVAS_H;
-    drawCard(canvas, card);
-  }
+  if (card.isMarker) drawMarker(canvas, card);
+  else drawCard(canvas, card);
   const url = canvas.toDataURL("image/png");
   imageCache.set(key, url);
   return url;
 }
 
 // ---------- PDF生成 ----------
-// 1種類のカード群を、指定グリッドでページ送りしながら配置する
-function placeGrid(pdf, items, g, isFirstPage) {
-  const gridW = g.cols * g.cellW + (g.cols - 1) * GAP_MM;
-  const gridH = g.rows * g.cellH + (g.rows - 1) * GAP_MM;
-  const marginX = (PAGE_W_MM - gridW) / 2;
-  const marginY = (PAGE_H_MM - gridH) / 2;
-  const drawW = g.cellW - 2 * g.shrinkX;
-  const drawH = g.cellH - 2 * g.shrinkY;
-  const perPage = g.cols * g.rows;
-  for (let start = 0; start < items.length; start += perPage) {
-    if (!(isFirstPage && start === 0)) pdf.addPage();
-    items.slice(start, start + perPage).forEach((card, i) => {
-      const col = i % g.cols;
-      const row = Math.floor(i / g.cols);
-      const x = marginX + col * (g.cellW + GAP_MM) + g.shrinkX;
-      const y = marginY + row * (g.cellH + GAP_MM) + g.shrinkY;
-      pdf.addImage(getCardDataURL(card), "PNG", x, y, drawW, drawH);
-    });
-  }
-}
-
 function buildPDF(cardList) {
   const { jsPDF } = window.jspdf;
   const pdf = new jsPDF({ unit: "mm", format: "a4" });
 
-  const normals = cardList.filter((c) => !c.isMarker);
-  const markers = cardList.filter((c) => c.isMarker);
+  const gridW = COLS * CARD_W_MM + (COLS - 1) * GAP_MM;
+  const gridH = ROWS * CARD_H_MM + (ROWS - 1) * GAP_MM;
+  const marginX = (PAGE_W_MM - gridW) / 2;
+  const marginY = (PAGE_H_MM - gridH) / 2;
+  const drawW = CARD_W_MM - 2 * SHRINK_X_MM;
+  const drawH = CARD_H_MM - 2 * SHRINK_Y_MM;
 
-  // 通常カード：縦向き 3×3＝9枚/ページ（仕上がり59×80mm）
-  placeGrid(pdf, normals,
-    { cols: COLS, rows: ROWS, cellW: CARD_W_MM, cellH: CARD_H_MM, shrinkX: SHRINK_X_MM, shrinkY: SHRINK_Y_MM },
-    true);
-  // マーカー：横向き 2×4＝8枚/ページ（縮小量も90度回して仕上がり80×59mm）。通常カードとはページを分ける
-  placeGrid(pdf, markers,
-    { cols: 2, rows: 4, cellW: CARD_H_MM, cellH: CARD_W_MM, shrinkX: SHRINK_Y_MM, shrinkY: SHRINK_X_MM },
-    normals.length === 0);
-
+  const perPage = COLS * ROWS;
+  for (let start = 0; start < cardList.length; start += perPage) {
+    if (start > 0) pdf.addPage();
+    const chunk = cardList.slice(start, start + perPage);
+    chunk.forEach((card, i) => {
+      const col = i % COLS;
+      const row = Math.floor(i / COLS);
+      const cellX = marginX + col * (CARD_W_MM + GAP_MM);
+      const cellY = marginY + row * (CARD_H_MM + GAP_MM);
+      const x = cellX + SHRINK_X_MM;
+      const y = cellY + SHRINK_Y_MM;
+      const dataUrl = getCardDataURL(card);
+      pdf.addImage(dataUrl, "PNG", x, y, drawW, drawH);
+    });
+  }
   pdf.save("highsto_proxy_memo.pdf");
 }
 
@@ -582,15 +672,64 @@ function renderMarkerList() {
     label.textContent = preset.lines.join("");
     const btn = document.createElement("button");
     btn.textContent = "追加";
-    btn.onclick = () => addToQueue(makeMarkerCard(preset.category, preset.lines));
+    btn.onclick = () => addToQueue(makeMarkerCard(preset.category, preset.lines, preset.style, preset.variant));
     li.appendChild(label);
     li.appendChild(btn);
     markerListEl.appendChild(li);
   }
 }
 
+const markerPreviewImg = document.getElementById("markerPreview");
+const markerRotationEl = document.getElementById("markerRotation");
+const markerBgInput = document.getElementById("markerBgInput");
+const markerBgOpacityEl = document.getElementById("markerBgOpacity");
+const markerBgOpacityValEl = document.getElementById("markerBgOpacityVal");
+const markerBgClearBtn = document.getElementById("markerBgClearBtn");
+const markerBgStatusEl = document.getElementById("markerBgStatus");
+
+// 設定変更後：マーカーの描画キャッシュを破棄し、プレビューを更新
+async function refreshMarkerPreview() {
+  for (const key of [...imageCache.keys()]) if (String(key).startsWith("marker:")) imageCache.delete(key);
+  const sample = makeMarkerCard("攻撃制限", ["攻撃", "できない"]);
+  await ensureFonts([sample]);
+  markerPreviewImg.src = getCardDataURL(sample);
+}
+
 toggleMarkerBtn.addEventListener("click", () => {
-  markerPanel.style.display = markerPanel.style.display === "none" ? "block" : "none";
+  const open = markerPanel.style.display === "none";
+  markerPanel.style.display = open ? "block" : "none";
+  if (open) refreshMarkerPreview();
+});
+
+markerRotationEl.addEventListener("change", () => {
+  markerSettings.rotation = Number(markerRotationEl.value);
+  refreshMarkerPreview();
+});
+
+markerBgOpacityEl.addEventListener("input", () => {
+  markerSettings.bgOpacity = Number(markerBgOpacityEl.value) / 100;
+  markerBgOpacityValEl.textContent = `${markerBgOpacityEl.value}%`;
+  refreshMarkerPreview();
+});
+
+markerBgInput.addEventListener("change", async () => {
+  const file = markerBgInput.files && markerBgInput.files[0];
+  if (!file) return;
+  markerBgStatusEl.textContent = "読み込み中…";
+  try {
+    await loadMarkerBackground(file);
+    markerBgStatusEl.textContent = `背景を設定しました（${file.name}／グレースケール・カードサイズに変換。画像はブラウザ内でのみ処理されます）`;
+    await refreshMarkerPreview();
+  } catch (e) {
+    markerBgStatusEl.textContent = "画像を読み込めませんでした（JPEG・PNG・WebPなどをお試しください）。";
+  }
+});
+
+markerBgClearBtn.addEventListener("click", () => {
+  markerSettings.bgCanvas = null;
+  markerBgInput.value = "";
+  markerBgStatusEl.textContent = "背景を削除しました。";
+  refreshMarkerPreview();
 });
 
 // 自由入力：改行位置は「/」で指定（例：次のターン/攻撃できない）。省略時は全体を1行として自動縮小
